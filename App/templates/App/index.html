@@ -1,0 +1,346 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invernadero Nona Olimpia · Monitoreo y Asistencia a la Decisión</title>
+  <link rel="icon" type="image/jpeg" href="{% static 'App/img/isotipo.jpg' %}">
+  <link rel="stylesheet" href="{% static 'App/css/styles.css' %}">
+</head>
+<body>
+<div class="app" id="app">
+  <!-- ================= BARRA LATERAL ================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-badge brand-full">
+        <img src="{% static 'App/img/logo-nona.png' %}" alt="Nona Olimpia Hidroponia" class="brand-logo-full">
+      </div>
+      <div class="brand-badge-mini brand-mini">
+        <img src="{% static 'App/img/isotipo.jpg' %}" alt="Nona Olimpia" class="brand-isotipo">
+      </div>
+      <span class="brand-subtitle">Invernadero · SCADA Web</span>
+    </div>
+    <nav class="nav">
+      <a href="#monitor" class="nav-item active" data-view="monitor" title="Monitor en vivo">
+        <svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Monitor en vivo</span>
+      </a>
+      <a href="#historial" class="nav-item" data-view="historial" title="Historial y comparador">
+        <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Historial y comparador</span>
+      </a>
+      <a href="#eventos" class="nav-item" data-view="eventos" title="Eventos, alertas y movimientos">
+        <svg viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17v.5"/></svg><span>Eventos y alertas</span>
+        <b class="nav-badge" id="navBadge" hidden>0</b>
+      </a>
+      <a href="#config" class="nav-item" data-view="config" title="Configuración y cultivos">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span>Configuración y cultivos</span>
+      </a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="who">
+        <div class="avatar">AS</div>
+        <div><strong>{{ encargada }}</strong><span>Encargada</span></div>
+      </div>
+      <p class="loc">📍 Las Pampitas, Perico, Jujuy</p>
+      <a class="admin-link" href="/admin/" target="_blank">Administración Django ↗</a>
+    </div>
+  </aside>
+  <div class="overlay" id="overlay"></div>
+
+  <!-- ================= CONTENIDO ================= -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="btnMenu" aria-label="Mostrar/ocultar menú">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div class="titles">
+        <h1 id="viewTitle">Monitor en vivo</h1>
+        <p><span id="tbInvernadero">Invernadero</span> · Cultivo: <b id="tbCultivo">—</b></p>
+      </div>
+      <div class="clock" title="Hora simulada">
+        <span class="dot" id="liveDot"></span>
+        <div>
+          <strong id="simHora">--:--</strong>
+          <span id="simFecha">—</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="toast-zone" id="toasts"></div>
+
+    <!-- ========== VISTA 1: MONITOR EN VIVO ========== -->
+    <section class="view active" id="view-monitor">
+      <div class="card simbar">
+        <div class="simbar-group">
+          <span class="simbar-label">Simulador</span>
+          <button class="btn" id="btnPausa">⏸ Pausar</button>
+          <div class="seg" id="segVelocidad">
+            <button data-v="1">1x</button><button data-v="2">2x</button><button data-v="5">5x</button><button data-v="15">15x</button>
+          </div>
+          <button class="btn" id="btnHora09">🌅 Poner hora a las 09:00</button>
+          <label class="switch" title="En modo automático el sistema aplica la acción al emitirse la alerta">
+            <input type="checkbox" id="chkAuto"><span class="slider"></span><em>Modo automático</em>
+          </label>
+        </div>
+        <div class="simbar-group">
+          <span class="simbar-label">Escenarios</span>
+          <button class="btn chip" data-esc="nube_5">☁️ Nube pasajera 5 min</button>
+          <button class="btn chip" data-esc="nublado_45">🌥️ Nublado largo 45 min</button>
+          <button class="btn chip" data-esc="sol_30">☀️ Sol intenso 30 min</button>
+          <button class="btn chip" data-esc="calor_60">🔥 Ola de calor 60 min</button>
+          <button class="btn chip" data-esc="sol_calor_45">☀️🔥 Sol + Calor extremo 45 min</button>
+          <button class="btn chip ghost" data-esc="quitar">✖ Quitar pruebas</button>
+        </div>
+        <div class="esc-activo" id="escActivo" hidden></div>
+      </div>
+
+      <div class="grid-3">
+        <!-- Radiación -->
+        <article class="card kpi" id="kpiRad">
+          <header><h3>☀️ Radiación solar</h3><span class="pill" id="radPill">—</span></header>
+          <div class="kpi-value"><strong id="radValor">—</strong><span>W/m²</span></div>
+          <div class="rangebar" id="radBar"><div class="band"></div><div class="marker"></div></div>
+          <div class="range-legend"><span>0</span><span id="radRangoTxt">Óptimo —</span><span>1000</span></div>
+          <div class="persist">
+            <div class="persist-head"><span>Persistencia fuera de rango</span><b id="radPersTxt">0 / 10 min</b></div>
+            <div class="progress"><div id="radPersBar"></div></div>
+          </div>
+          <p class="kpi-note" id="radNota"></p>
+        </article>
+        <!-- Temperatura -->
+        <article class="card kpi" id="kpiTemp">
+          <header><h3>🌡️ Temperatura interna</h3><span class="pill" id="tempPill">—</span></header>
+          <div class="kpi-value"><strong id="tempValor">—</strong><span>°C</span></div>
+          <div class="rangebar" id="tempBar"><div class="band"></div><div class="marker"></div></div>
+          <div class="range-legend"><span>0 °C</span><span id="tempRangoTxt">Óptimo —</span><span>40 °C</span></div>
+          <div class="persist">
+            <div class="persist-head"><span>Persistencia fuera de rango</span><b id="tempPersTxt">0 / 10 min</b></div>
+            <div class="progress"><div id="tempPersBar"></div></div>
+          </div>
+          <p class="kpi-note" id="tempNota"></p>
+        </article>
+        <!-- Decisión -->
+        <article class="card kpi decision" id="kpiDecision">
+          <header><h3>🧭 Decisión sugerida</h3><span class="pill" id="decPill">Motor</span></header>
+          <div class="decision-main">
+            <div class="decision-icon" id="decIcono">✓</div>
+            <div>
+              <strong id="decTexto">Mantener</strong>
+              <span id="decEtiqueta">Variables dentro del rango óptimo</span>
+            </div>
+          </div>
+          <ul class="decision-acciones" id="decAcciones"></ul>
+          <div class="decision-alertas" id="decAlertas"></div>
+          <div class="decision-footer">
+            <button class="btn primary" id="btnAccion">✔ Simular acción sugerida tomada</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="grid-main">
+        <article class="card">
+          <header class="card-head">
+            <h3>📈 Últimas horas</h3>
+            <div class="seg small" id="segHoras">
+              <button data-h="3">3h</button><button data-h="6" class="on">6h</button><button data-h="12">12h</button>
+            </div>
+          </header>
+          <div class="chart-legend">
+            <span><i class="lg band"></i>Rango óptimo</span>
+            <span><i class="lg tri"></i>Alerta persistente</span>
+            <span><i class="lg circ"></i>Variación transitoria filtrada</span>
+            <span><i class="lg day"></i>Franja diurna evaluada</span>
+            <span><i class="lg mov"></i>Movimiento de mecanismo</span>
+          </div>
+          <div class="chart-box"><canvas id="chartRad"></canvas></div>
+          <div class="chart-box"><canvas id="chartTemp"></canvas></div>
+        </article>
+
+        <article class="card">
+          <header class="card-head"><h3>🏡 Esquema del invernadero</h3><span class="muted" id="ghEstado">—</span></header>
+          <div id="greenhouse" class="greenhouse"></div>
+          <div class="mecanismos" id="mecanismos"></div>
+          <div class="clima" id="clima"></div>
+        </article>
+      </div>
+
+      <article class="card">
+        <header class="card-head">
+          <h3>🎚️ Parámetros configurables rápidos</h3>
+          <span class="muted">Se guardan en SQLite (PARAMETROS) con copia en HISTORIAL_PARAMETROS al soltar el control</span>
+        </header>
+        <div class="sliders" id="sliders">
+          <label class="sl"><span>Temp. mínima <b data-out="temp_min"></b> °C</span><input type="range" data-p="temp_min" min="0" max="25" step="0.5"></label>
+          <label class="sl"><span>Temp. máxima <b data-out="temp_max"></b> °C</span><input type="range" data-p="temp_max" min="15" max="40" step="0.5"></label>
+          <label class="sl"><span>Radiación mínima <b data-out="rad_min"></b> W/m²</span><input type="range" data-p="rad_min" min="0" max="400" step="10"></label>
+          <label class="sl"><span>Radiación máxima <b data-out="rad_max"></b> W/m²</span><input type="range" data-p="rad_max" min="300" max="1000" step="10"></label>
+          <label class="sl"><span>Persistencia <b data-out="tiempo_persistencia_min"></b> min</span><input type="range" data-p="tiempo_persistencia_min" min="1" max="60" step="1"></label>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== VISTA 2: HISTORIAL Y COMPARADOR ========== -->
+    <section class="view" id="view-historial">
+      <article class="card">
+        <header class="card-head"><h3>📅 Comparar jornadas</h3></header>
+        <div class="filters">
+          <label>Jornada A <select id="diaA"></select></label>
+          <label>Jornada B <select id="diaB"></select></label>
+          <button class="btn primary" id="btnComparar">Comparar</button>
+          <span class="muted">Los indicadores se calculan con los umbrales vigentes del cultivo activo.</span>
+        </div>
+        <div class="chart-box tall"><canvas id="chartComparar"></canvas></div>
+      </article>
+      <div class="grid-2">
+        <article class="card">
+          <header class="card-head"><h3>📋 Indicadores</h3></header>
+          <div class="table-wrap">
+            <table class="table" id="tablaIndicadores">
+              <thead><tr><th>Indicador</th><th id="thA">Jornada A</th><th id="thB">Jornada B</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="card">
+          <header class="card-head"><h3>⏱️ Horas críticas (minutos fuera de rango por hora)</h3></header>
+          <div class="chart-box"><canvas id="chartCriticas"></canvas></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ========== VISTA 3: EVENTOS ========== -->
+    <section class="view" id="view-eventos">
+      <article class="card">
+        <header class="card-head"><h3>🗂️ Eventos, alertas y movimientos</h3><span class="muted" id="evTotal"></span></header>
+        <div class="filters">
+          <label>Tipo
+            <select id="fTipo">
+              <option value="">Todos</option>
+              <option value="ALERTA">Alertas</option>
+              <option value="RECOMENDACION">Recomendaciones</option>
+              <option value="TRANSITORIA">Transitorias</option>
+              <option value="NORMALIZACION">Normalizaciones</option>
+              <option value="MOVIMIENTO">Movimientos de mecanismos</option>
+            </select>
+          </label>
+          <label>Variable
+            <select id="fVariable">
+              <option value="">Todas</option>
+              <option value="TEMPERATURA">Temperatura</option>
+              <option value="RADIACION">Radiación</option>
+              <option value="MECANISMO">Mecanismos</option>
+            </select>
+          </label>
+          <label>Jornada <select id="fDia"><option value="">Todas</option></select></label>
+          <button class="btn" id="btnEvRefrescar">↻ Actualizar</button>
+          <button class="btn" id="btnCopiarTabla">📋 Copiar tabla</button>
+          <a class="btn primary" id="btnDescargarXlsx" href="/api/eventos.xlsx">⬇ Exportar Excel (.xlsx)</a>
+        </div>
+        <div class="ev-counters" id="evCounters"></div>
+        <div class="table-wrap scroll">
+          <table class="table" id="tablaEventos">
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Variable</th><th>Valor</th><th>Duración / Origen</th><th>Descripción</th><th>Usuario</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <!-- ========== VISTA 4: CONFIGURACIÓN ========== -->
+    <section class="view" id="view-config">
+      <div class="config-banner">
+        <div class="config-banner-info">
+          <span class="config-banner-tag">Identidad productiva</span>
+          <h2>Invernadero Nona Olimpia</h2>
+          <p>Las Pampitas, Perico, Jujuy · Cultivo hidropónico de referencia: Lechuga Salanova</p>
+        </div>
+        <div class="config-banner-media">
+          <img src="{% static 'App/img/banner-nona.jpg' %}" alt="Nona Olimpia Hidroponia – Lechuga Salanova, Producto Jujeño">
+        </div>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <header class="card-head"><h3>🌱 Cultivos</h3><span class="muted" id="cfgInvernadero"></span></header>
+          <div class="cultivos" id="listaCultivos"></div>
+          <form class="form" id="formCultivo" autocomplete="off">
+            <h4 id="formCultivoTitulo">Alta de cultivo</h4>
+            <input type="hidden" name="id">
+            <label>Nombre <input name="nombre" required minlength="3" placeholder="Ej.: Lechuga Mantecosa"></label>
+            <label>Recomendaciones agronómicas <textarea name="recomendaciones" rows="3" placeholder="Notas de manejo del cultivo"></textarea></label>
+            <div class="form-row" id="cultivoParamsNuevos">
+              <label>T° mín <input name="temp_min" type="number" step="0.5" value="10"></label>
+              <label>T° máx <input name="temp_max" type="number" step="0.5" value="25"></label>
+              <label>Rad mín <input name="rad_min" type="number" step="10" value="150"></label>
+              <label>Rad máx <input name="rad_max" type="number" step="10" value="600"></label>
+              <label>Persist. <input name="tiempo_persistencia_min" type="number" step="1" value="10"></label>
+            </div>
+            <label class="check"><input type="checkbox" name="asignar"> Asignar al invernadero al guardar</label>
+            <div class="form-actions">
+              <button type="button" class="btn ghost" id="btnCultivoNuevo">Nuevo</button>
+              <button class="btn primary" type="submit">Guardar cultivo</button>
+            </div>
+          </form>
+        </article>
+
+        <article class="card">
+          <header class="card-head"><h3>⚙️ Umbrales avanzados del cultivo activo</h3><span class="muted" id="cfgActualizado"></span></header>
+          <form class="form" id="formParametros" autocomplete="off">
+            <fieldset>
+              <legend>Temperatura interna (°C)</legend>
+              <div class="form-row">
+                <label>Mínimo <input name="temp_min" type="number" step="0.1" required></label>
+                <label>Máximo <input name="temp_max" type="number" step="0.1" required></label>
+                <label>Histéresis <input name="histeresis_temp" type="number" step="0.1" min="0" required></label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Radiación solar (W/m²)</legend>
+              <div class="form-row">
+                <label>Mínimo <input name="rad_min" type="number" step="1" required></label>
+                <label>Máximo <input name="rad_max" type="number" step="1" required></label>
+                <label>Histéresis <input name="histeresis_rad" type="number" step="1" min="0" required></label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Evaluación</legend>
+              <div class="form-row">
+                <label>Persistencia (min) <input name="tiempo_persistencia_min" type="number" step="1" min="1" required></label>
+                <label>Franja diurna desde <input name="hora_inicio_diurna" type="time" required></label>
+                <label>hasta <input name="hora_fin_diurna" type="time" required></label>
+              </div>
+            </fieldset>
+            <label>Motivo del cambio <input name="motivo" placeholder="Ej.: ajuste por etapa de cosecha"></label>
+            <p class="help">La <b>persistencia</b> filtra variaciones cortas (p. ej. una nube de 5 min). La <b>histéresis</b> exige que la variable vuelva a entrar en el rango con ese margen antes de cerrar la alerta. La radiación sólo se evalúa dentro de la <b>franja diurna</b>.</p>
+            <div class="form-actions"><button class="btn primary" type="submit">Guardar parámetros</button></div>
+          </form>
+        </article>
+      </div>
+      <div class="config-bottom">
+        <article class="card photo-card">
+          <header class="card-head"><h3>🏡 Invernadero real</h3><span class="muted">Sector A</span></header>
+          <div class="photo-frame">
+            <img src="{% static 'App/img/invernadero-real.jpg' %}" alt="Invernadero real Nona Olimpia con cultivo de Lechuga Salanova">
+          </div>
+          <p class="photo-caption">Producción bajo cubierta con control de media sombra y ventilación lateral en Las Pampitas, Perico, Jujuy.</p>
+        </article>
+        <article class="card">
+          <header class="card-head"><h3>🕓 HISTORIAL_PARAMETROS</h3><span class="muted">Auditoría de cada modificación de umbrales</span></header>
+          <div class="table-wrap scroll">
+            <table class="table" id="tablaHistParam">
+              <thead><tr><th>Fecha</th><th>T° mín</th><th>T° máx</th><th>Rad mín</th><th>Rad máx</th><th>Persist.</th><th>Hist. T°</th><th>Hist. Rad</th><th>Franja diurna</th><th>Usuario</th><th>Motivo</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="foot">Invernadero Nona Olimpia · Sistema Web de Monitoreo, Evaluación de Persistencia y Asistencia a la Decisión · Lechuga Salanova · Las Pampitas, Perico, Jujuy</footer>
+  </div>
+</div>
+<div class="tooltip" id="tooltip" hidden></div>
+
+<script src="{% static 'App/js/charts.js' %}"></script>
+<script src="{% static 'App/js/greenhouse.js' %}"></script>
+<script src="{% static 'App/js/app.js' %}"></script>
+</body>
+</html>
